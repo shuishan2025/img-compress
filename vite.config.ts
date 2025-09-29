@@ -6,6 +6,7 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: './',
   plugins: [
     vue(),
     vueDevTools(),
@@ -16,7 +17,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ['@squoosh/lib']
+    exclude: ['@jsquash/jpeg', '@jsquash/webp', '@jsquash/oxipng', '@jsquash/avif']
   },
   define: {
     global: 'globalThis',
@@ -44,7 +45,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          'squoosh': ['@squoosh/lib']
+          codecs: ['@jsquash/jpeg', '@jsquash/webp', '@jsquash/avif', '@jsquash/oxipng']
         }
       }
     }

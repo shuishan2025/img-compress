@@ -427,7 +427,6 @@ onBeforeUnmount(() => {
           <el-icon class="info-icon"><InfoFilled /></el-icon>
           <span>
             {{ t('upload.infoText') }}
-            <a href="#" class="link">{{ t('upload.loginText') }}</a> {{ t('upload.removeRestriction') }}
           </span>
           <br />
           <span>{{ t('upload.pdfCompress') }} <a href="#" class="link">{{ t('upload.here') }}</a>{{ t('upload.compressPdf') }}</span>

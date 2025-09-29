@@ -113,7 +113,6 @@ export class SmartCompressor {
 
     // 获取像素数据
     const imageDataObj = ctx.getImageData(0, 0, dimensions.width, dimensions.height)
-    const rgbaData = new Uint8Array(imageDataObj.data)
 
     onProgress?.(70)
 
@@ -123,11 +122,7 @@ export class SmartCompressor {
     onProgress?.(80)
 
     // 使用WASM编码
-    const compressedData = await codec.encode(rgbaData, {
-      ...codecOptions,
-      width: dimensions.width,
-      height: dimensions.height
-    })
+    const compressedData = await codec.encode(imageDataObj, codecOptions)
 
     onProgress?.(95)
 
@@ -248,8 +243,7 @@ export class SmartCompressor {
         options.quality = settings.quality
         break
       case 'avif':
-        // AVIF使用CQ级别，需要转换
-        options.cqLevel = Math.round((100 - settings.quality) * 0.63)
+        options.quality = settings.quality
         break
       case 'png':
         // PNG是无损格式，质量设置无效

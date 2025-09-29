@@ -30,8 +30,6 @@ export default {
   upload: {
     dragText: "拖拽图片到此处或点击上传",
     infoText: "在线压缩JPG、GIF和PNG格式图片。文件最大限制10MB。",
-    loginText: "登录",
-    removeRestriction: "以移除限制。",
     pdfCompress: "您也可以在",
     here: "这里",
     compressPdf: "压缩PDF文件。"

@@ -30,8 +30,6 @@ export default {
   upload: {
     dragText: "Drag images here or click to upload",
     infoText: "Compress JPG, GIF and PNG online. The files should have maximum 10Mb.",
-    loginText: "Login",
-    removeRestriction: "to remove the restriction.",
     pdfCompress: "You can also compress PDFs",
     here: "here",
     compressPdf: "."

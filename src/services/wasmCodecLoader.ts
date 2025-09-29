@@ -3,113 +3,105 @@
  * 支持按需加载、错误降级、性能优化
  */
 
-export interface CodecModule {
-  encode: (imageData: Uint8Array, options: any) => Promise<Uint8Array>
+import type { EncodeOptions as MozjpegEncodeOptions } from '@jsquash/jpeg/meta.js'
+import { defaultOptions as mozjpegDefaultOptions } from '@jsquash/jpeg/meta.js'
+import type { EncodeOptions as WebpEncodeOptions } from '@jsquash/webp/meta.js'
+import { defaultOptions as webpDefaultOptions } from '@jsquash/webp/meta.js'
+import type { EncodeOptions as AvifEncodeOptions } from '@jsquash/avif/meta.js'
+import { defaultOptions as avifDefaultOptions } from '@jsquash/avif/meta.js'
+import type { OptimiseOptions as OxiPngOptions } from '@jsquash/oxipng/meta.js'
+import { defaultOptions as oxipngDefaultOptions } from '@jsquash/oxipng/meta.js'
+
+export interface CodecModule<TOptions extends object = Record<string, unknown>> {
+  encode: (imageData: ImageData, options: Partial<TOptions>) => Promise<Uint8Array>
   decode?: (data: Uint8Array) => Promise<ImageData>
 }
 
-export interface CodecInfo {
+interface CodecInfo<TOptions extends object = Record<string, unknown>> {
   name: string
   formats: string[]
-  wasmUrl: string
-  jsUrl: string
-  defaultOptions: any
+  defaultOptions: TOptions
   priority: number
+  loader: () => Promise<CodecModule<TOptions>>
+}
+
+const mozjpegConfig: CodecInfo<MozjpegEncodeOptions> = {
+  name: 'MozJPEG',
+  formats: ['jpeg', 'jpg'],
+  defaultOptions: mozjpegDefaultOptions,
+  priority: 1,
+  loader: async () => {
+    const { encode } = await import('@jsquash/jpeg')
+
+    return {
+      encode: async (imageData: ImageData, options: Partial<MozjpegEncodeOptions>) => {
+        const result = await encode(imageData, options)
+        return new Uint8Array(result)
+      }
+    }
+  }
+}
+
+const oxipngConfig: CodecInfo<OxiPngOptions> = {
+  name: 'OxiPNG',
+  formats: ['png'],
+  defaultOptions: oxipngDefaultOptions,
+  priority: 1,
+  loader: async () => {
+    const { optimise } = await import('@jsquash/oxipng')
+
+    return {
+      encode: async (imageData: ImageData, options: Partial<OxiPngOptions>) => {
+        const result = await optimise(imageData, options)
+        return new Uint8Array(result)
+      }
+    }
+  }
+}
+
+const webpConfig: CodecInfo<WebpEncodeOptions> = {
+  name: 'WebP',
+  formats: ['webp'],
+  defaultOptions: webpDefaultOptions,
+  priority: 1,
+  loader: async () => {
+    const { encode } = await import('@jsquash/webp')
+
+    return {
+      encode: async (imageData: ImageData, options: Partial<WebpEncodeOptions>) => {
+        const result = await encode(imageData, options)
+        return new Uint8Array(result)
+      }
+    }
+  }
+}
+
+const avifConfig: CodecInfo<AvifEncodeOptions> = {
+  name: 'AVIF',
+  formats: ['avif'],
+  defaultOptions: avifDefaultOptions,
+  priority: 2,
+  loader: async () => {
+    const { encode } = await import('@jsquash/avif')
+
+    return {
+      encode: async (imageData: ImageData, options: Partial<AvifEncodeOptions>) => {
+        const result = await encode(imageData, {
+          ...options,
+          bitDepth: 8
+        })
+        return new Uint8Array(result)
+      }
+    }
+  }
 }
 
 // 支持的编码器配置
-const CODEC_CONFIGS: Record<string, CodecInfo> = {
-  mozjpeg: {
-    name: 'MozJPEG',
-    formats: ['jpeg', 'jpg'],
-    wasmUrl: '@squoosh/lib/codecs/mozjpeg/enc/mozjpeg_enc.wasm',
-    jsUrl: '@squoosh/lib/codecs/mozjpeg/enc/mozjpeg_enc.js',
-    defaultOptions: {
-      quality: 80,
-      baseline: false,
-      arithmetic: false,
-      progressive: true,
-      optimize_coding: true,
-      smoothing: 0,
-      color_space: 3,
-      quant_table: 3,
-      trellis_multipass: false,
-      trellis_opt_zero: false,
-      trellis_opt_table: false,
-      trellis_loops: 1,
-      auto_subsample: true,
-      chroma_subsample: 2,
-      separate_chroma_quality: false,
-      chroma_quality: 75
-    },
-    priority: 1
-  },
-  oxipng: {
-    name: 'OxiPNG',
-    formats: ['png'],
-    wasmUrl: '@squoosh/lib/codecs/oxipng/enc/oxipng_enc.wasm',
-    jsUrl: '@squoosh/lib/codecs/oxipng/enc/oxipng_enc.js',
-    defaultOptions: {
-      level: 3,
-      interlace: false
-    },
-    priority: 1
-  },
-  webp: {
-    name: 'WebP',
-    formats: ['webp'],
-    wasmUrl: '@squoosh/lib/codecs/webp/enc/webp_enc.wasm',
-    jsUrl: '@squoosh/lib/codecs/webp/enc/webp_enc.js',
-    defaultOptions: {
-      quality: 80,
-      target_size: 0,
-      target_PSNR: 0,
-      method: 4,
-      sns_strength: 50,
-      filter_strength: 60,
-      filter_sharpness: 0,
-      filter_type: 1,
-      partitions: 0,
-      segments: 4,
-      pass: 1,
-      show_compressed: 0,
-      preprocessing: 0,
-      autofilter: 0,
-      partition_limit: 0,
-      alpha_compression: 1,
-      alpha_filtering: 1,
-      alpha_quality: 100,
-      lossless: 0,
-      exact: 0,
-      image_hint: 0,
-      emulate_jpeg_size: 0,
-      thread_level: 0,
-      low_memory: 0,
-      near_lossless: 100,
-      use_delta_palette: 0,
-      use_sharp_yuv: 0
-    },
-    priority: 1
-  },
-  avif: {
-    name: 'AVIF',
-    formats: ['avif'],
-    wasmUrl: '@squoosh/lib/codecs/avif/enc/avif_enc.wasm',
-    jsUrl: '@squoosh/lib/codecs/avif/enc/avif_enc.js',
-    defaultOptions: {
-      cqLevel: 33,
-      cqAlphaLevel: -1,
-      denoiseLevel: 0,
-      tileColsLog2: 0,
-      tileRowsLog2: 0,
-      speed: 6,
-      subsample: 1,
-      chromaDeltaQ: false,
-      sharpness: 0,
-      tune: 0
-    },
-    priority: 2
-  }
+const CODEC_CONFIGS: Record<string, CodecInfo<any>> = {
+  mozjpeg: mozjpegConfig,
+  oxipng: oxipngConfig,
+  webp: webpConfig,
+  avif: avifConfig
 }
 
 export class WASMCodecLoader {
@@ -198,20 +190,12 @@ export class WASMCodecLoader {
     try {
       console.log(`Loading WASM codec: ${config.name}`)
 
-      // 动态导入编码器模块
-      const module = await import(/* @vite-ignore */ config.jsUrl)
-
-      if (!module.default) {
-        throw new Error(`Invalid codec module: ${codecName}`)
-      }
-
-      // 初始化WASM模块
-      const wasmModule = await module.default()
+      const wasmModule = await config.loader()
 
       console.log(`Successfully loaded WASM codec: ${config.name}`)
 
       return {
-        encode: async (imageData: Uint8Array, options: any) => {
+        encode: async (imageData: ImageData, options: Record<string, unknown>) => {
           const mergedOptions = { ...config.defaultOptions, ...options }
           return wasmModule.encode(imageData, mergedOptions)
         }
@@ -246,7 +230,12 @@ export class WASMCodecLoader {
    */
   getDefaultOptions(format: string): any {
     const codecName = this.getCodecNamePrivate(format)
-    return codecName ? CODEC_CONFIGS[codecName].defaultOptions : {}
+    if (!codecName) {
+      return {}
+    }
+
+    const defaults = CODEC_CONFIGS[codecName].defaultOptions
+    return { ...defaults }
   }
 
   /**
