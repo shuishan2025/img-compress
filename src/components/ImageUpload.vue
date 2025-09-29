@@ -13,7 +13,7 @@
           ref="fileInput"
           type="file"
           multiple
-          accept="image/jpeg,image/png,image/webp"
+          accept="image/jpeg,image/png,image/webp,image/avif"
           @change="handleFileSelect"
           style="display: none"
         />
@@ -24,7 +24,7 @@
           </el-icon>
           <div class="upload-text">
             <p class="primary-text">拖拽图片到此处或点击选择</p>
-            <p class="secondary-text">支持 JPEG、PNG、WebP 格式</p>
+            <p class="secondary-text">支持 JPEG、PNG、WebP、AVIF 格式</p>
             <p class="hint-text">支持批量上传多张图片</p>
           </div>
         </div>
@@ -45,6 +45,7 @@
             <el-option label="JPEG" value="jpeg" />
             <el-option label="PNG" value="png" />
             <el-option label="WebP" value="webp" />
+            <el-option label="AVIF" value="avif" />
           </el-select>
         </el-form-item>
 
@@ -164,7 +165,7 @@ const createImageFile = async (file: File): Promise<ImageFile> => {
 const processFiles = async (files: FileList | File[]) => {
   const fileArray = Array.from(files)
   const validFiles = fileArray.filter(file => {
-    const isValidType = ['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
+    const isValidType = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'].includes(file.type)
     if (!isValidType) {
       ElMessage.warning(`文件 ${file.name} 不是支持的图片格式`)
     }

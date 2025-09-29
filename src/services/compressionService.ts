@@ -15,19 +15,39 @@ class CompressionService {
   private readonly maxWorkers = navigator.hardwareConcurrency || 4
 
   private createWorker(): Worker {
-    return new Worker(
-      new URL('../workers/imageCompression.ts', import.meta.url),
-      { type: 'module' }
-    )
+    try {
+      const worker = new Worker(
+        new URL('../workers/imageCompression.ts', import.meta.url),
+        { type: 'module' }
+      )
+
+      // 添加更详细的错误监听
+      worker.addEventListener('error', (error) => {
+        console.error('Worker error event:', error)
+      })
+
+      worker.addEventListener('messageerror', (error) => {
+        console.error('Worker message error:', error)
+      })
+
+      return worker
+    } catch (error) {
+      console.error('Failed to create worker:', error)
+      throw new Error('无法创建图片压缩工作线程')
+    }
   }
 
   private initWorkers() {
     if (this.workers.length === 0) {
       for (let i = 0; i < this.maxWorkers; i++) {
-        const worker = this.createWorker()
-        worker.onmessage = this.handleWorkerMessage.bind(this)
-        worker.onerror = this.handleWorkerError.bind(this)
-        this.workers.push(worker)
+        try {
+          const worker = this.createWorker()
+          worker.onmessage = this.handleWorkerMessage.bind(this)
+          worker.onerror = this.handleWorkerError.bind(this)
+          this.workers.push(worker)
+        } catch (error) {
+          console.error('Failed to create worker:', error)
+        }
       }
     }
   }
@@ -59,11 +79,25 @@ class CompressionService {
 
   private handleWorkerError(error: ErrorEvent) {
     console.error('Worker error:', error)
+    console.error('Error details:', {
+      message: error.message,
+      filename: error.filename,
+      lineno: error.lineno,
+      colno: error.colno,
+      error: error.error
+    })
+
     // 找到并拒绝所有待处理的任务
     this.tasks.forEach(task => {
-      task.reject(new Error('Worker执行错误'))
+      task.reject(new Error(`Worker执行错误: ${error.message || '未知错误'}`))
     })
     this.tasks.clear()
+
+    // 重新初始化workers
+    this.destroy()
+    setTimeout(() => {
+      this.initWorkers()
+    }, 1000)
   }
 
   private async fileToArrayBuffer(file: File): Promise<ArrayBuffer> {

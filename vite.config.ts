@@ -16,7 +16,11 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ['jszip']
+    exclude: ['@squoosh/lib']
+  },
+  define: {
+    global: 'globalThis',
+    'process.env': {},
   },
   server: {
     headers: {
@@ -29,9 +33,21 @@ export default defineConfig({
   },
   worker: {
     format: 'es',
-    plugins: () => [vue()]
+    rollupOptions: {
+      output: {
+        format: 'es'
+      }
+    }
   },
   build: {
-    target: 'esnext'
-  }
+    target: 'esnext',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'squoosh': ['@squoosh/lib']
+        }
+      }
+    }
+  },
+  assetsInclude: ['**/*.wasm']
 })

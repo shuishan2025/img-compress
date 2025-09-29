@@ -18,6 +18,6 @@ export interface CompressionSettings {
   quality: number
   maxWidth?: number
   maxHeight?: number
-  format: 'jpeg' | 'png' | 'webp'
+  format: 'jpeg' | 'png' | 'webp' | 'avif'
   removeMetadata: boolean
 }

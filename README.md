@@ -4,7 +4,7 @@
 
 ## ✨ 功能特性
 
-- 🎯 **多格式支持**: 支持 JPEG、PNG、WebP 格式的压缩
+- 🎯 **多格式支持**: 支持 JPEG、PNG、WebP、AVIF 格式的压缩
 - 🔧 **灵活配置**: 可调节压缩质量（1-100%）和图片尺寸
 - 📁 **批量处理**: 支持同时处理多张图片
 - 👀 **实时预览**: 压缩前后对比预览，显示尺寸和体积信息
@@ -19,9 +19,8 @@
 
 - **前端框架**: Vue 3 + TypeScript
 - **UI组件库**: Element Plus
-- **图片处理**: Canvas API + OffscreenCanvas
+- **图片处理**: Canvas + ImageBitmap API
 - **构建工具**: Vite
-- **打包工具**: JSZip
 
 ## 📦 安装和使用
 
@@ -72,7 +71,7 @@ npm run type-check
 ## 🔧 压缩参数
 
 - **压缩质量**: 1-100%，默认90%
-- **输出格式**: JPEG、PNG、WebP
+- **输出格式**: JPEG、PNG、WebP、AVIF
 - **最大宽度/高度**: 可选择限制图片尺寸
 - **移除元数据**: 默认开启，清理EXIF信息
 

@@ -1,4 +1,3 @@
-import JSZip from 'jszip'
 import type { ImageFile } from '@/types/image'
 
 class DownloadService {
@@ -21,6 +20,8 @@ class DownloadService {
         return 'png'
       case 'webp':
         return 'webp'
+      case 'avif':
+        return 'avif'
       default:
         return 'jpg'
     }
@@ -41,91 +42,6 @@ class DownloadService {
     this.downloadBlob(image.compressedBlob, filename)
   }
 
-  async downloadAsZip(
-    images: ImageFile[],
-    format: string = 'jpeg',
-    onProgress?: (progress: number) => void
-  ): Promise<void> {
-    const completedImages = images.filter(
-      image => image.status === 'completed' && image.compressedBlob
-    )
-
-    if (completedImages.length === 0) {
-      throw new Error('没有可下载的压缩图片')
-    }
-
-    const zip = new JSZip()
-    const total = completedImages.length
-
-    // 添加所有图片到ZIP
-    completedImages.forEach((image, index) => {
-      if (image.compressedBlob) {
-        const filename = this.generateFilename(image.file.name, format)
-        zip.file(filename, image.compressedBlob)
-      }
-
-      if (onProgress) {
-        onProgress(Math.round(((index + 1) / total) * 50)) // 前50%为添加文件
-      }
-    })
-
-    // 生成ZIP文件
-    try {
-      const zipBlob = await zip.generateAsync(
-        {
-          type: 'blob',
-          compression: 'DEFLATE',
-          compressionOptions: {
-            level: 6
-          }
-        },
-        (metadata) => {
-          if (onProgress) {
-            // 后50%为生成ZIP
-            onProgress(50 + Math.round(metadata.percent / 2))
-          }
-        }
-      )
-
-      // 下载ZIP文件
-      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
-      const zipFilename = `compressed_images_${timestamp}.zip`
-      this.downloadBlob(zipBlob, zipFilename)
-
-      if (onProgress) {
-        onProgress(100)
-      }
-    } catch (error) {
-      throw new Error('生成ZIP文件失败: ' + (error as Error).message)
-    }
-  }
-
-  async createZipPreview(
-    images: ImageFile[],
-    format: string = 'jpeg'
-  ): Promise<{ filename: string; size: number; count: number }> {
-    const completedImages = images.filter(
-      image => image.status === 'completed' && image.compressedBlob
-    )
-
-    if (completedImages.length === 0) {
-      throw new Error('没有可预览的压缩图片')
-    }
-
-    const totalSize = completedImages.reduce((sum, image) => {
-      return sum + (image.compressedSize || 0)
-    }, 0)
-
-    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
-    const filename = `compressed_images_${timestamp}.zip`
-
-    return {
-      filename,
-      size: totalSize,
-      count: completedImages.length
-    }
-  }
-
   // 批量下载单张图片（不打包）
   downloadMultiple(images: ImageFile[], format: string = 'jpeg'): void {
     const completedImages = images.filter(
@@ -143,6 +59,7 @@ class DownloadService {
       }, index * 100) // 每100ms下载一个
     })
   }
+
 
   // 获取所有已完成图片的统计信息
   getCompletedImagesStats(images: ImageFile[]): {

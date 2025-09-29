@@ -1,5 +1,106 @@
 import type { CompressionSettings } from '@/types/image'
 
+// Worker环境polyfills
+if (typeof globalThis === 'undefined') {
+  (self as any).globalThis = self
+}
+
+// 使用 ImageBitmap 进行 Worker 兼容的图片处理
+async function canvasCompress(
+  imageData: ArrayBuffer,
+  settings: CompressionSettings,
+  onProgress: (progress: number) => void
+): Promise<{
+  compressedData: ArrayBuffer
+  originalSize: number
+  compressedSize: number
+  dimensions: { width: number; height: number }
+}> {
+  try {
+    onProgress(10)
+
+    // 创建Blob并解码为ImageBitmap (Worker兼容)
+    const blob = new Blob([imageData])
+    const imageBitmap = await createImageBitmap(blob)
+
+    onProgress(30)
+
+    // 计算新尺寸
+    let { width, height } = imageBitmap
+    if (settings.maxWidth && width > settings.maxWidth) {
+      height = (height * settings.maxWidth) / width
+      width = settings.maxWidth
+    }
+    if (settings.maxHeight && height > settings.maxHeight) {
+      width = (width * settings.maxHeight) / height
+      height = settings.maxHeight
+    }
+
+    const newWidth = Math.round(width)
+    const newHeight = Math.round(height)
+
+    onProgress(50)
+
+    // 创建 OffscreenCanvas
+    const canvas = new OffscreenCanvas(newWidth, newHeight)
+    const ctx = canvas.getContext('2d')!
+
+    // 绘制图像
+    ctx.drawImage(imageBitmap, 0, 0, newWidth, newHeight)
+
+    // 释放 ImageBitmap
+    imageBitmap.close()
+
+    onProgress(70)
+
+    // 确定输出格式和质量
+    let mimeType = 'image/jpeg'
+    let quality = settings.quality / 100
+
+    switch (settings.format) {
+      case 'png':
+        mimeType = 'image/png'
+        quality = 1 // PNG不支持质量设置
+        break
+      case 'webp':
+        mimeType = 'image/webp'
+        break
+      case 'avif':
+        // Canvas不支持AVIF，降级为WebP
+        mimeType = 'image/webp'
+        console.warn('AVIF not supported in Canvas, using WebP instead')
+        break
+      case 'jpeg':
+      default:
+        mimeType = 'image/jpeg'
+        break
+    }
+
+    onProgress(90)
+
+    // 转换为Blob
+    const compressedBlob = await canvas.convertToBlob({
+      type: mimeType,
+      quality: quality
+    })
+
+    const compressedArrayBuffer = await compressedBlob.arrayBuffer()
+
+    onProgress(100)
+
+    return {
+      compressedData: compressedArrayBuffer,
+      originalSize: imageData.byteLength,
+      compressedSize: compressedArrayBuffer.byteLength,
+      dimensions: { width: newWidth, height: newHeight }
+    }
+
+  } catch (error) {
+    console.error('Canvas compression error details:', error)
+    throw new Error(`图片处理失败: ${error instanceof Error ? error.message : '未知错误'}`)
+  }
+}
+
 interface WorkerMessage {
   type: 'compress'
   imageData: ArrayBuffer
@@ -21,64 +122,7 @@ interface WorkerResponse {
   error?: string
 }
 
-const calculateDimensions = (
-  originalWidth: number,
-  originalHeight: number,
-  maxWidth?: number,
-  maxHeight?: number
-): { width: number; height: number } => {
-  if (!maxWidth && !maxHeight) {
-    return { width: originalWidth, height: originalHeight }
-  }
-
-  let newWidth = originalWidth
-  let newHeight = originalHeight
-
-  if (maxWidth && originalWidth > maxWidth) {
-    newWidth = maxWidth
-    newHeight = (originalHeight * maxWidth) / originalWidth
-  }
-
-  if (maxHeight && newHeight > maxHeight) {
-    newHeight = maxHeight
-    newWidth = (newWidth * maxHeight) / newHeight
-  }
-
-  return {
-    width: Math.round(newWidth),
-    height: Math.round(newHeight)
-  }
-}
-
-const createCanvas = (width: number, height: number): { canvas: OffscreenCanvas; ctx: OffscreenCanvasRenderingContext2D } => {
-  const canvas = new OffscreenCanvas(width, height)
-  const ctx = canvas.getContext('2d')
-  if (!ctx) {
-    throw new Error('无法创建Canvas上下文')
-  }
-  return { canvas, ctx }
-}
-
-const loadImage = (arrayBuffer: ArrayBuffer): Promise<ImageBitmap> => {
-  return new Promise((resolve, reject) => {
-    const blob = new Blob([arrayBuffer])
-    createImageBitmap(blob)
-      .then(resolve)
-      .catch(reject)
-  })
-}
-
-const canvasToBlob = (canvas: OffscreenCanvas, format: string, quality: number): Promise<Blob> => {
-  const mimeType = format === 'jpeg' ? 'image/jpeg' :
-                   format === 'png' ? 'image/png' :
-                   format === 'webp' ? 'image/webp' : 'image/jpeg'
-
-  return canvas.convertToBlob({
-    type: mimeType,
-    quality: quality / 100
-  })
-}
-
+// 主要压缩函数，使用Canvas实现
 const compressImage = async (
   imageData: ArrayBuffer,
   settings: CompressionSettings,
@@ -90,47 +134,15 @@ const compressImage = async (
   dimensions: { width: number; height: number }
 }> => {
   try {
-    onProgress(10)
-
-    // 加载图片
-    const imageBitmap = await loadImage(imageData)
-    onProgress(30)
-
-    // 计算新尺寸
-    const newDimensions = calculateDimensions(
-      imageBitmap.width,
-      imageBitmap.height,
-      settings.maxWidth,
-      settings.maxHeight
-    )
-    onProgress(40)
-
-    // 创建Canvas并绘制
-    const { canvas, ctx } = createCanvas(newDimensions.width, newDimensions.height)
-
-    // 绘制图片到Canvas
-    ctx.drawImage(imageBitmap, 0, 0, newDimensions.width, newDimensions.height)
-    onProgress(60)
-
-    // 转换为Blob
-    const blob = await canvasToBlob(canvas, settings.format, settings.quality)
-    onProgress(80)
-
-    // 转换为ArrayBuffer
-    const compressedData = await blob.arrayBuffer()
-    onProgress(100)
-
-    return {
-      compressedData,
-      originalSize: imageData.byteLength,
-      compressedSize: compressedData.byteLength,
-      dimensions: newDimensions
-    }
+    console.log('Starting Canvas-based compression')
+    return await canvasCompress(imageData, settings, onProgress)
   } catch (error) {
+    console.error('Canvas compression error:', error)
     throw new Error(`压缩失败: ${error instanceof Error ? error.message : '未知错误'}`)
   }
 }
 
+// 处理Worker消息
 self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
   const { type, imageData, settings, id } = event.data
 
@@ -152,6 +164,7 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
       }
       self.postMessage(response)
     } catch (error) {
+      console.error('Worker compression error:', error)
       const response: WorkerResponse = {
         type: 'error',
         id,
@@ -160,6 +173,15 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
       self.postMessage(response)
     }
   }
+}
+
+// 添加全局错误处理
+self.onerror = (error) => {
+  console.error('Worker global error:', error)
+}
+
+self.onunhandledrejection = (event) => {
+  console.error('Worker unhandled promise rejection:', event.reason)
 }
 
 export {}

@@ -83,19 +83,13 @@ const downloadAll = async () => {
 
   const loading = ElLoading.service({
     lock: true,
-    text: '正在打包下载...',
+    text: '正在批量下载...',
     background: 'rgba(0, 0, 0, 0.7)'
   })
 
   try {
-    await downloadService.downloadAsZip(
-      completedImages,
-      'jpeg', // 使用JPEG格式
-      (progress) => {
-        loading.setText(`正在打包下载... ${progress}%`)
-      }
-    )
-    ElMessage.success('下载完成')
+    downloadService.downloadMultiple(completedImages, 'jpeg')
+    ElMessage.success(`开始下载 ${completedImages.length} 个文件`)
   } catch (error) {
     ElMessage.error('下载失败: ' + (error as Error).message)
   } finally {
@@ -152,7 +146,7 @@ onBeforeUnmount(() => {
             图片压缩工具
           </h1>
           <p class="page-subtitle">
-            支持 JPEG、PNG、WebP 格式 | 纯本地处理，保护隐私
+            支持 JPEG、PNG、WebP、AVIF 格式 | 纯本地处理，保护隐私
           </p>
         </div>
       </el-header>
