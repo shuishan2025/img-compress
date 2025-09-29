@@ -126,8 +126,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import { Download, Delete, ArrowRight, Picture, Warning } from '@element-plus/icons-vue'
 import type { ImageFile } from '@/types/image'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   images: ImageFile[]
@@ -168,7 +171,7 @@ const getCompressionRatioClass = (ratio?: number): string => {
 const downloadAll = () => {
   const completedImages = props.images.filter(image => image.status === 'completed')
   if (completedImages.length === 0) {
-    ElMessage.warning('没有可下载的图片')
+    ElMessage.warning(t('messages.noDownloadImages'))
     return
   }
   emit('downloadAll')
@@ -176,7 +179,7 @@ const downloadAll = () => {
 
 const downloadSingle = (image: ImageFile) => {
   if (image.status !== 'completed') {
-    ElMessage.warning('图片尚未压缩完成')
+    ElMessage.warning(t('messages.imageNotReady'))
     return
   }
   emit('downloadSingle', image)
@@ -189,7 +192,25 @@ const removeImage = (id: string) => {
 
 <style scoped>
 .image-preview-container {
-  margin-top: 20px;
+  margin-top: 0;
+}
+
+.image-preview-container :deep(.el-card) {
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 16px;
+  box-shadow: var(--shadow-sm, 0 1px 2px 0 rgb(0 0 0 / 0.05));
+  background: var(--background-white, #ffffff);
+}
+
+.image-preview-container :deep(.el-card__header) {
+  background: var(--background-light, #f8fafc);
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 16px 16px 0 0;
+  padding: 20px 24px;
+}
+
+.image-preview-container :deep(.el-card__body) {
+  padding: 24px;
 }
 
 .card-header {
@@ -197,13 +218,37 @@ const removeImage = (id: string) => {
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+  font-size: 16px;
 }
 
 .header-actions {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   flex-wrap: wrap;
+}
+
+.header-actions :deep(.el-button--primary) {
+  background-color: var(--primary-teal, #14b8a6);
+  border-color: var(--primary-teal, #14b8a6);
+  font-weight: 500;
+  border-radius: 8px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.header-actions :deep(.el-button--primary:hover) {
+  background-color: var(--primary-teal-dark, #0d9488);
+  border-color: var(--primary-teal-dark, #0d9488);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1));
+}
+
+.header-actions :deep(.el-button) {
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .image-grid {
@@ -212,54 +257,61 @@ const removeImage = (id: string) => {
 }
 
 .image-item {
-  border: 1px solid #e4e7ed;
-  border-radius: 8px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px;
   overflow: hidden;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: var(--background-white, #ffffff);
+  box-shadow: var(--shadow-sm, 0 1px 2px 0 rgb(0 0 0 / 0.05));
 }
 
 .image-item:hover {
-  border-color: #409eff;
-  box-shadow: 0 2px 12px 0 rgba(64, 158, 255, 0.1);
+  border-color: var(--primary-teal, #14b8a6);
+  box-shadow: var(--shadow-lg, 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1));
+  transform: translateY(-2px);
 }
 
 .image-item.is-processing {
-  border-color: #e6a23c;
-  background-color: #fdf6ec;
+  border-color: #f59e0b;
+  background-color: #fffbeb;
 }
 
 .image-preview {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  padding: 16px;
-  background-color: #fafafa;
+  padding: 20px;
+  background: var(--background-light, #f8fafc);
 }
 
 .image-side {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 
 .image-label {
-  font-size: 12px;
-  font-weight: 500;
-  color: #606266;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary, #64748b);
   text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
 }
 
 .image-wrapper {
   position: relative;
-  width: 120px;
-  height: 120px;
-  border-radius: 6px;
+  width: 140px;
+  height: 140px;
+  border-radius: 12px;
   overflow: hidden;
-  background-color: #f5f7fa;
+  background: var(--background-white, #ffffff);
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: var(--shadow-sm, 0 1px 2px 0 rgb(0 0 0 / 0.05));
+  border: 1px solid var(--border-color, #e2e8f0);
 }
 
 .image-wrapper img {
@@ -273,10 +325,10 @@ const removeImage = (id: string) => {
   bottom: 0;
   left: 0;
   right: 0;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
-  padding: 8px 6px 4px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+  padding: 12px 8px 6px;
   transform: translateY(100%);
-  transition: transform 0.3s ease;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .image-wrapper:hover .image-overlay {
@@ -287,7 +339,8 @@ const removeImage = (id: string) => {
   color: white;
   font-size: 11px;
   text-align: center;
-  line-height: 1.2;
+  line-height: 1.3;
+  font-weight: 500;
 }
 
 .placeholder {
@@ -295,115 +348,144 @@ const removeImage = (id: string) => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  color: #909399;
-  font-size: 12px;
+  gap: 12px;
+  color: var(--text-muted, #94a3b8);
+  font-size: 13px;
   text-align: center;
   height: 100%;
+  font-weight: 500;
 }
 
 .placeholder.processing {
-  color: #e6a23c;
+  color: #f59e0b;
 }
 
 .placeholder.error {
-  color: #f56c6c;
+  color: #ef4444;
 }
 
 .placeholder .el-icon {
-  font-size: 24px;
+  font-size: 28px;
 }
 
 .divider {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 16px;
-  color: #c0c4cc;
+  padding: 0 20px;
+  color: var(--primary-teal, #14b8a6);
+  font-size: 20px;
 }
 
 .file-info {
-  padding: 16px;
-  border-top: 1px solid #e4e7ed;
+  padding: 20px 24px;
+  border-top: 1px solid var(--border-color, #e2e8f0);
+  background: var(--background-white, #ffffff);
 }
 
 .file-name {
-  font-weight: 500;
-  color: #303133;
-  margin-bottom: 8px;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+  margin-bottom: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 15px;
 }
 
 .compression-stats {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 12px;
-  font-size: 12px;
+  gap: 12px;
+  margin-bottom: 16px;
+  font-size: 13px;
 }
 
 .stat-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 8px 12px;
+  background: var(--background-light, #f8fafc);
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #e2e8f0);
 }
 
 .stat-item .label {
-  color: #909399;
-}
-
-.stat-item .value {
+  color: var(--text-secondary, #64748b);
   font-weight: 500;
 }
 
+.stat-item .value {
+  font-weight: 600;
+}
+
 .value.excellent {
-  color: #67c23a;
+  color: #10b981;
 }
 
 .value.good {
-  color: #409eff;
+  color: var(--primary-teal, #14b8a6);
 }
 
 .value.normal {
-  color: #e6a23c;
+  color: #f59e0b;
 }
 
 .value.poor {
-  color: #f56c6c;
+  color: #ef4444;
 }
 
 .value.success {
-  color: #67c23a;
+  color: #10b981;
 }
 
 .action-buttons {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   justify-content: flex-end;
+}
+
+.action-buttons :deep(.el-button) {
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.action-buttons :deep(.el-button--primary) {
+  background-color: transparent;
+  border-color: var(--primary-teal, #14b8a6);
+  color: var(--primary-teal, #14b8a6);
+}
+
+.action-buttons :deep(.el-button--primary:hover) {
+  background-color: var(--primary-teal, #14b8a6);
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1));
 }
 
 @media (max-width: 768px) {
   .image-preview {
     grid-template-columns: 1fr;
-    gap: 16px;
+    gap: 20px;
     text-align: center;
+    padding: 16px;
   }
 
   .divider {
     transform: rotate(90deg);
-    padding: 8px 0;
+    padding: 12px 0;
   }
 
   .image-wrapper {
-    width: 100px;
-    height: 100px;
+    width: 120px;
+    height: 120px;
   }
 
   .compression-stats {
     grid-template-columns: 1fr;
-    gap: 4px;
+    gap: 8px;
   }
 
   .action-buttons {
@@ -414,12 +496,25 @@ const removeImage = (id: string) => {
     justify-content: center;
     width: 100%;
   }
+
+  .file-info {
+    padding: 16px 20px;
+  }
+
+  .image-preview-container :deep(.el-card__header) {
+    padding: 16px 20px;
+  }
+
+  .image-preview-container :deep(.el-card__body) {
+    padding: 20px;
+  }
 }
 
 @media (max-width: 480px) {
   .card-header {
     flex-direction: column;
     align-items: stretch;
+    gap: 12px;
   }
 
   .header-actions {
@@ -428,6 +523,19 @@ const removeImage = (id: string) => {
 
   .header-actions .el-button {
     flex: 1;
+  }
+
+  .image-wrapper {
+    width: 100px;
+    height: 100px;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+  }
+
+  .action-buttons .el-button {
+    width: 100%;
   }
 }
 </style>

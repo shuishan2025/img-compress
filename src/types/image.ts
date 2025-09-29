@@ -12,6 +12,8 @@ export interface ImageFile {
   status: 'pending' | 'processing' | 'completed' | 'error'
   progress?: number
   error?: string
+  compressionMethod?: 'wasm' | 'canvas'
+  codec?: string
 }
 
 export interface CompressionSettings {

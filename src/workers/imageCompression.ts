@@ -5,100 +5,28 @@ if (typeof globalThis === 'undefined') {
   (self as any).globalThis = self
 }
 
-// 使用 ImageBitmap 进行 Worker 兼容的图片处理
-async function canvasCompress(
-  imageData: ArrayBuffer,
-  settings: CompressionSettings,
-  onProgress: (progress: number) => void
-): Promise<{
-  compressedData: ArrayBuffer
-  originalSize: number
-  compressedSize: number
-  dimensions: { width: number; height: number }
-}> {
-  try {
-    onProgress(10)
+// 动态导入智能压缩服务
+let SmartCompressor: any = null
+let smartCompressor: any = null
 
-    // 创建Blob并解码为ImageBitmap (Worker兼容)
-    const blob = new Blob([imageData])
-    const imageBitmap = await createImageBitmap(blob)
-
-    onProgress(30)
-
-    // 计算新尺寸
-    let { width, height } = imageBitmap
-    if (settings.maxWidth && width > settings.maxWidth) {
-      height = (height * settings.maxWidth) / width
-      width = settings.maxWidth
+async function loadSmartCompressor() {
+  if (!SmartCompressor) {
+    try {
+      const module = await import('../services/smartCompressor.js')
+      SmartCompressor = module.SmartCompressor
+      smartCompressor = new SmartCompressor({
+        preferWASM: true,
+        enablePreload: false, // Worker中手动控制预加载
+        fallbackToCanvas: true,
+        maxWASMSize: 20 * 1024 * 1024 // 20MB 在Worker中更保守
+      })
+      console.log('Smart compressor loaded in worker')
+    } catch (error) {
+      console.error('Failed to load smart compressor:', error)
+      throw new Error('无法加载智能压缩服务')
     }
-    if (settings.maxHeight && height > settings.maxHeight) {
-      width = (width * settings.maxHeight) / height
-      height = settings.maxHeight
-    }
-
-    const newWidth = Math.round(width)
-    const newHeight = Math.round(height)
-
-    onProgress(50)
-
-    // 创建 OffscreenCanvas
-    const canvas = new OffscreenCanvas(newWidth, newHeight)
-    const ctx = canvas.getContext('2d')!
-
-    // 绘制图像
-    ctx.drawImage(imageBitmap, 0, 0, newWidth, newHeight)
-
-    // 释放 ImageBitmap
-    imageBitmap.close()
-
-    onProgress(70)
-
-    // 确定输出格式和质量
-    let mimeType = 'image/jpeg'
-    let quality = settings.quality / 100
-
-    switch (settings.format) {
-      case 'png':
-        mimeType = 'image/png'
-        quality = 1 // PNG不支持质量设置
-        break
-      case 'webp':
-        mimeType = 'image/webp'
-        break
-      case 'avif':
-        // Canvas不支持AVIF，降级为WebP
-        mimeType = 'image/webp'
-        console.warn('AVIF not supported in Canvas, using WebP instead')
-        break
-      case 'jpeg':
-      default:
-        mimeType = 'image/jpeg'
-        break
-    }
-
-    onProgress(90)
-
-    // 转换为Blob
-    const compressedBlob = await canvas.convertToBlob({
-      type: mimeType,
-      quality: quality
-    })
-
-    const compressedArrayBuffer = await compressedBlob.arrayBuffer()
-
-    onProgress(100)
-
-    return {
-      compressedData: compressedArrayBuffer,
-      originalSize: imageData.byteLength,
-      compressedSize: compressedArrayBuffer.byteLength,
-      dimensions: { width: newWidth, height: newHeight }
-    }
-
-  } catch (error) {
-    console.error('Canvas compression error details:', error)
-    throw new Error(`图片处理失败: ${error instanceof Error ? error.message : '未知错误'}`)
   }
+  return smartCompressor
 }
 
 interface WorkerMessage {
@@ -110,19 +38,23 @@ interface WorkerMessage {
 }
 
 interface WorkerResponse {
-  type: 'progress' | 'success' | 'error'
+  type: 'progress' | 'success' | 'error' | 'method_info'
   id: string
   data?: {
     compressedData: ArrayBuffer
     originalSize: number
     compressedSize: number
     dimensions: { width: number; height: number }
+    method?: 'wasm' | 'canvas'
+    codec?: string
   }
   progress?: number
   error?: string
+  method?: string
+  codec?: string
 }
 
-// 主要压缩函数，使用Canvas实现
+// 主要压缩函数，使用智能压缩服务
 const compressImage = async (
   imageData: ArrayBuffer,
   settings: CompressionSettings,
@@ -132,12 +64,30 @@ const compressImage = async (
   originalSize: number
   compressedSize: number
   dimensions: { width: number; height: number }
+  method?: 'wasm' | 'canvas'
+  codec?: string
 }> => {
   try {
-    console.log('Starting Canvas-based compression')
-    return await canvasCompress(imageData, settings, onProgress)
+    console.log('Starting smart compression...')
+
+    // 加载智能压缩服务
+    const compressor = await loadSmartCompressor()
+
+    // 使用智能压缩
+    const result = await compressor.compress(imageData, settings, onProgress)
+
+    console.log(`Compression completed using ${result.method}${result.codec ? ` (${result.codec})` : ''}`)
+
+    return {
+      compressedData: result.compressedData,
+      originalSize: result.originalSize,
+      compressedSize: result.compressedSize,
+      dimensions: result.dimensions,
+      method: result.method,
+      codec: result.codec
+    }
   } catch (error) {
-    console.error('Canvas compression error:', error)
+    console.error('Smart compression error:', error)
     throw new Error(`压缩失败: ${error instanceof Error ? error.message : '未知错误'}`)
   }
 }
@@ -157,10 +107,28 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
         self.postMessage(response)
       })
 
+      // 发送压缩方法信息
+      if (result.method) {
+        const methodResponse: WorkerResponse = {
+          type: 'method_info',
+          id,
+          method: result.method,
+          codec: result.codec
+        }
+        self.postMessage(methodResponse)
+      }
+
       const response: WorkerResponse = {
         type: 'success',
         id,
-        data: result
+        data: {
+          compressedData: result.compressedData,
+          originalSize: result.originalSize,
+          compressedSize: result.compressedSize,
+          dimensions: result.dimensions,
+          method: result.method,
+          codec: result.codec
+        }
       }
       self.postMessage(response)
     } catch (error) {

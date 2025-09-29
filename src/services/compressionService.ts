@@ -5,6 +5,7 @@ interface CompressionTask {
   resolve: (result: any) => void
   reject: (error: Error) => void
   onProgress?: (progress: number) => void
+  onMethodInfo?: (method: string, codec?: string) => void
 }
 
 class CompressionService {
@@ -53,7 +54,7 @@ class CompressionService {
   }
 
   private handleWorkerMessage(event: MessageEvent) {
-    const { type, id, data, progress, error } = event.data
+    const { type, id, data, progress, error, method, codec } = event.data
     const task = this.tasks.get(id)
 
     if (!task) return
@@ -62,6 +63,12 @@ class CompressionService {
       case 'progress':
         if (task.onProgress && typeof progress === 'number') {
           task.onProgress(progress)
+        }
+        break
+
+      case 'method_info':
+        if (task.onMethodInfo && method) {
+          task.onMethodInfo(method, codec)
         }
         break
 
@@ -145,7 +152,8 @@ class CompressionService {
     imageFile: ImageFile,
     settings: CompressionSettings,
     worker: Worker,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    onMethodInfo?: (method: string, codec?: string) => void
   ) {
     try {
       const imageData = await this.fileToArrayBuffer(imageFile.file)
@@ -155,7 +163,8 @@ class CompressionService {
           id: imageFile.id,
           resolve,
           reject,
-          onProgress
+          onProgress,
+          onMethodInfo
         }
         this.tasks.set(imageFile.id, task)
 
@@ -178,7 +187,8 @@ class CompressionService {
   async compressImage(
     imageFile: ImageFile,
     settings: CompressionSettings,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    onMethodInfo?: (method: string, codec?: string) => void
   ): Promise<{
     compressedData: ArrayBuffer
     originalSize: number
@@ -190,7 +200,7 @@ class CompressionService {
     const availableWorker = this.getAvailableWorker()
 
     if (availableWorker) {
-      return this.processImageWithWorker(imageFile, settings, availableWorker, onProgress)
+      return this.processImageWithWorker(imageFile, settings, availableWorker, onProgress, onMethodInfo)
     } else {
       // 添加到队列
       return new Promise((resolve, reject) => {
@@ -207,7 +217,8 @@ class CompressionService {
           id: imageFile.id,
           resolve,
           reject,
-          onProgress
+          onProgress,
+          onMethodInfo
         }
         this.tasks.set(imageFile.id, task)
 
@@ -221,7 +232,8 @@ class CompressionService {
     settings: CompressionSettings,
     onProgress?: (imageId: string, progress: number) => void,
     onImageComplete?: (imageId: string, result: any) => void,
-    onImageError?: (imageId: string, error: Error) => void
+    onImageError?: (imageId: string, error: Error) => void,
+    onMethodInfo?: (imageId: string, method: string, codec?: string) => void
   ): Promise<void> {
     this.initWorkers()
 
@@ -232,6 +244,9 @@ class CompressionService {
           settings,
           (progress) => {
             if (onProgress) onProgress(imageFile.id, progress)
+          },
+          (method, codec) => {
+            if (onMethodInfo) onMethodInfo(imageFile.id, method, codec)
           }
         )
 
