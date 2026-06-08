@@ -1,0 +1,17 @@
+{
+  "name": "img-ops",
+  "type": "module",
+  "description": "Pixel ops (EXIF orientation + high-quality resize) that @jsquash doesn't provide",
+  "version": "0.1.0",
+  "license": "MIT",
+  "files": [
+    "img_ops_bg.wasm",
+    "img_ops.js",
+    "img_ops.d.ts"
+  ],
+  "main": "img_ops.js",
+  "types": "img_ops.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

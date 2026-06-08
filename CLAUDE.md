@@ -9,12 +9,12 @@ A client-side image compression tool built with Vue 3 + TypeScript. Compresses J
 ## Commands
 
 ### Development
-- `npm run dev` - Start development server with Vite (runs `build:wasm` first via `predev`)
+- `npm run dev` - Start development server with Vite
 - `npm run preview` - Preview production build
 
 ### Build & Quality
-- `npm run build` - Type check and build for production (runs `build:wasm` first via `prebuild`)
-- `npm run build:wasm` - Compile `rust/img-ops` to WASM via wasm-pack → `src/wasm/img-ops/`
+- `npm run build` - Type check and build for production
+- `npm run build:wasm` - Recompile `rust/img-ops` to WASM (run manually after editing Rust; commit the result)
 - `npm run build-only` - Build without type checking
 - `npm run type-check` - Run Vue TSC type checking
 - `npm run lint` - Run ESLint with auto-fix
@@ -22,7 +22,8 @@ A client-side image compression tool built with Vue 3 + TypeScript. Compresses J
 
 ### Toolchain
 - Node.js `^20.19.0 || >=22.12.0`
-- Rust + `wasm-pack` + `wasm32-unknown-unknown` target (required to build `img-ops`; deploy envs must have it). `src/wasm/img-ops/` is a gitignored build artifact.
+- The compiled WASM artifact `src/wasm/img-ops/` **is committed to the repo**, so `npm install && npm run build` works without Rust (deploy envs do NOT need a Rust toolchain).
+- Editing the Rust crate requires Rust + `wasm-pack` + the `wasm32-unknown-unknown` target; run `npm run build:wasm` and commit the regenerated artifact.
 
 ## Architecture
 
