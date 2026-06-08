@@ -1,0 +1,20 @@
+[package]
+name = "img-ops"
+version = "0.1.0"
+edition = "2021"
+description = "Pixel ops (EXIF orientation + high-quality resize) that @jsquash doesn't provide"
+license = "MIT"
+
+[lib]
+# cdylib -> wasm, rlib -> native `cargo test`
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+fast_image_resize = "5"
+kamadak-exif = "0.6"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

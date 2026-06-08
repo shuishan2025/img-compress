@@ -1,0 +1,4 @@
+# Scope SIMD to the wasm target only, so host-target build deps (proc-macros,
+# build scripts) don't emit "unrecognized feature" warnings.
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "target-feature=+simd128"]

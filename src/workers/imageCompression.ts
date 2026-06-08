@@ -15,10 +15,8 @@ async function loadSmartCompressor() {
       const module = await import('../services/smartCompressor.js')
       SmartCompressor = module.SmartCompressor
       smartCompressor = new SmartCompressor({
-        preferWASM: true,
         enablePreload: false, // Worker中手动控制预加载
-        fallbackToCanvas: true,
-        maxWASMSize: 20 * 1024 * 1024 // 20MB 在Worker中更保守
+        fallbackToCanvas: true // @jsquash 解码失败时用 Canvas 兜底(带日志)
       })
       console.log('Smart compressor loaded in worker')
     } catch (error) {
@@ -47,6 +45,7 @@ interface WorkerResponse {
     dimensions: { width: number; height: number }
     method?: 'wasm' | 'canvas'
     codec?: string
+    decodedVia?: 'wasm' | 'canvas'
   }
   progress?: number
   error?: string
@@ -58,7 +57,8 @@ interface WorkerResponse {
 const compressImage = async (
   imageData: ArrayBuffer,
   settings: CompressionSettings,
-  onProgress: (progress: number) => void
+  onProgress: (progress: number) => void,
+  fileName?: string
 ): Promise<{
   compressedData: ArrayBuffer
   originalSize: number
@@ -66,6 +66,7 @@ const compressImage = async (
   dimensions: { width: number; height: number }
   method?: 'wasm' | 'canvas'
   codec?: string
+  decodedVia?: 'wasm' | 'canvas'
 }> => {
   try {
     console.log('Starting smart compression...')
@@ -74,7 +75,7 @@ const compressImage = async (
     const compressor = await loadSmartCompressor()
 
     // 使用智能压缩
-    const result = await compressor.compress(imageData, settings, onProgress)
+    const result = await compressor.compress(imageData, settings, onProgress, fileName)
 
     console.log(`Compression completed using ${result.method}${result.codec ? ` (${result.codec})` : ''}`)
 
@@ -84,7 +85,8 @@ const compressImage = async (
       compressedSize: result.compressedSize,
       dimensions: result.dimensions,
       method: result.method,
-      codec: result.codec
+      codec: result.codec,
+      decodedVia: result.decodedVia
     }
   } catch (error) {
     console.error('Smart compression error:', error)
@@ -94,18 +96,23 @@ const compressImage = async (
 
 // 处理Worker消息
 self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
-  const { type, imageData, settings, id } = event.data
+  const { type, imageData, settings, id, fileName } = event.data
 
   if (type === 'compress') {
     try {
-      const result = await compressImage(imageData, settings, (progress) => {
-        const response: WorkerResponse = {
-          type: 'progress',
-          id,
-          progress
-        }
-        self.postMessage(response)
-      })
+      const result = await compressImage(
+        imageData,
+        settings,
+        (progress) => {
+          const response: WorkerResponse = {
+            type: 'progress',
+            id,
+            progress
+          }
+          self.postMessage(response)
+        },
+        fileName
+      )
 
       // 发送压缩方法信息
       if (result.method) {
@@ -127,7 +134,8 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
           compressedSize: result.compressedSize,
           dimensions: result.dimensions,
           method: result.method,
-          codec: result.codec
+          codec: result.codec,
+          decodedVia: result.decodedVia
         }
       }
       self.postMessage(response)

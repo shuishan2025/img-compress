@@ -10,7 +10,12 @@
       "Bash(npm uninstall:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(cargo test *)",
+      "Bash(RUSTFLAGS=\"-C target-feature=+simd128\" wasm-pack build --release --target web --out-dir ../../src/wasm/img-ops)",
+      "Bash(wasm-pack build *)",
+      "Bash(rm -rf src/wasm/img-ops)",
+      "Bash(npm run *)"
     ],
     "deny": [],
     "ask": []

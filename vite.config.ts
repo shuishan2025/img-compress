@@ -17,7 +17,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ['@jsquash/jpeg', '@jsquash/webp', '@jsquash/oxipng', '@jsquash/avif']
+    exclude: ['@jsquash/jpeg', '@jsquash/png', '@jsquash/webp', '@jsquash/oxipng', '@jsquash/avif']
   },
   define: {
     global: 'globalThis',
@@ -45,7 +45,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          codecs: ['@jsquash/jpeg', '@jsquash/webp', '@jsquash/avif', '@jsquash/oxipng']
+          codecs: ['@jsquash/jpeg', '@jsquash/png', '@jsquash/webp', '@jsquash/avif', '@jsquash/oxipng']
         }
       }
     }

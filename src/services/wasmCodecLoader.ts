@@ -104,11 +104,92 @@ const CODEC_CONFIGS: Record<string, CodecInfo<any>> = {
   avif: avifConfig
 }
 
+// 解码器:输入文件字节 → RGBA 像素(ImageData)
+// 注意 oxipng 只编码不解码,PNG 解码用独立的 @jsquash/png
+type DecoderFn = (buffer: ArrayBuffer) => Promise<ImageData>
+
+const DECODER_LOADERS: Record<string, () => Promise<DecoderFn>> = {
+  jpeg: async () => {
+    const { decode } = await import('@jsquash/jpeg')
+    return (buffer) => decode(buffer)
+  },
+  png: async () => {
+    const { decode } = await import('@jsquash/png')
+    return (buffer) => decode(buffer)
+  },
+  webp: async () => {
+    const { decode } = await import('@jsquash/webp')
+    return (buffer) => decode(buffer)
+  },
+  avif: async () => {
+    const { decode } = await import('@jsquash/avif')
+    return async (buffer) => {
+      const result = await decode(buffer)
+      if (!result) {
+        throw new Error('AVIF decode returned null')
+      }
+      return result as ImageData
+    }
+  }
+}
+
+// 输入格式别名归一化
+function normalizeDecodeFormat(format: string): string {
+  const f = format.toLowerCase()
+  return f === 'jpg' ? 'jpeg' : f
+}
+
 export class WASMCodecLoader {
   private loadedCodecs = new Map<string, CodecModule>()
   private loadingPromises = new Map<string, Promise<CodecModule>>()
   private loadAttempts = new Map<string, number>()
   private maxRetries = 2
+
+  private loadedDecoders = new Map<string, DecoderFn>()
+  private loadingDecoders = new Map<string, Promise<DecoderFn>>()
+
+  /**
+   * 是否支持该输入格式的 WASM 解码
+   */
+  isDecodeSupported(format: string): boolean {
+    return normalizeDecodeFormat(format) in DECODER_LOADERS
+  }
+
+  /**
+   * 使用 @jsquash 解码输入文件字节为 RGBA(ImageData)
+   * 失败时抛出,由上层决定是否走 Canvas 兜底
+   */
+  async decode(format: string, buffer: ArrayBuffer): Promise<ImageData> {
+    const decoder = await this.getDecoder(format)
+    return decoder(buffer)
+  }
+
+  private async getDecoder(format: string): Promise<DecoderFn> {
+    const key = normalizeDecodeFormat(format)
+    const loader = DECODER_LOADERS[key]
+    if (!loader) {
+      throw new Error(`No WASM decoder available for format: ${format}`)
+    }
+
+    if (this.loadedDecoders.has(key)) {
+      return this.loadedDecoders.get(key)!
+    }
+
+    if (this.loadingDecoders.has(key)) {
+      return this.loadingDecoders.get(key)!
+    }
+
+    const loadingPromise = loader()
+    this.loadingDecoders.set(key, loadingPromise)
+
+    try {
+      const decoder = await loadingPromise
+      this.loadedDecoders.set(key, decoder)
+      return decoder
+    } finally {
+      this.loadingDecoders.delete(key)
+    }
+  }
 
   /**
    * 获取指定格式的编码器
@@ -261,6 +342,8 @@ export class WASMCodecLoader {
     this.loadedCodecs.clear()
     this.loadingPromises.clear()
     this.loadAttempts.clear()
+    this.loadedDecoders.clear()
+    this.loadingDecoders.clear()
   }
 }
 
