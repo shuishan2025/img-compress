@@ -19,13 +19,22 @@ export const FILTER_LANCZOS3 = 0
 export const FILTER_BILINEAR = 1
 
 let initPromise: Promise<void> | null = null
+let initInput: unknown = undefined
+
+/**
+ * 配置 img-ops 的 wasm 初始化入参(必须在首次 ensureImageOps 之前调用)。
+ * 浏览器无需调用(默认通过 URL fetch);Node/CLI 传 `{ module_or_path: <wasm 字节> }`。
+ */
+export function configureImageOps(input: unknown): void {
+  initInput = input
+}
 
 /**
  * 懒加载并初始化 img-ops WASM 模块(幂等)
  */
 export async function ensureImageOps(): Promise<void> {
   if (!initPromise) {
-    initPromise = init()
+    initPromise = init(initInput as never)
       .then(() => undefined)
       .catch((error) => {
         // 初始化失败时重置,允许后续重试

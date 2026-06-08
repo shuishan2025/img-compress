@@ -11,10 +11,28 @@ import type { EncodeOptions as AvifEncodeOptions } from '@jsquash/avif/meta.js'
 import { defaultOptions as avifDefaultOptions } from '@jsquash/avif/meta.js'
 import type { OptimiseOptions as OxiPngOptions } from '@jsquash/oxipng/meta.js'
 import { defaultOptions as oxipngDefaultOptions } from '@jsquash/oxipng/meta.js'
+import type { RawImage } from '@/core/types'
 
 export interface CodecModule<TOptions extends object = Record<string, unknown>> {
-  encode: (imageData: ImageData, options: Partial<TOptions>) => Promise<Uint8Array>
-  decode?: (data: Uint8Array) => Promise<ImageData>
+  encode: (imageData: RawImage, options: Partial<TOptions>) => Promise<Uint8Array>
+  decode?: (data: Uint8Array) => Promise<RawImage>
+}
+
+// 将 RawImage 转为真正的 ImageData 实例(浏览器原生 / Node polyfill 提供 global)。
+// 仅 oxipng 需要,因其用 `instanceof ImageData` 区分入参类型。
+function toImageData(image: RawImage): ImageData {
+  const ImageDataCtor = (globalThis as { ImageData?: typeof ImageData }).ImageData
+  if (!ImageDataCtor) {
+    throw new Error('ImageData 不可用(Node 环境需先注入 ImageData polyfill)')
+  }
+  if (image instanceof ImageDataCtor) {
+    return image
+  }
+  const clamped =
+    image.data instanceof Uint8ClampedArray
+      ? image.data
+      : new Uint8ClampedArray(image.data.buffer, image.data.byteOffset, image.data.byteLength)
+  return new ImageDataCtor(clamped, image.width, image.height)
 }
 
 interface CodecInfo<TOptions extends object = Record<string, unknown>> {
@@ -34,8 +52,8 @@ const mozjpegConfig: CodecInfo<MozjpegEncodeOptions> = {
     const { encode } = await import('@jsquash/jpeg')
 
     return {
-      encode: async (imageData: ImageData, options: Partial<MozjpegEncodeOptions>) => {
-        const result = await encode(imageData, options)
+      encode: async (imageData: RawImage, options: Partial<MozjpegEncodeOptions>) => {
+        const result = await encode(imageData as unknown as ImageData, options)
         return new Uint8Array(result)
       }
     }
@@ -51,8 +69,10 @@ const oxipngConfig: CodecInfo<OxiPngOptions> = {
     const { optimise } = await import('@jsquash/oxipng')
 
     return {
-      encode: async (imageData: ImageData, options: Partial<OxiPngOptions>) => {
-        const result = await optimise(imageData, options)
+      encode: async (imageData: RawImage, options: Partial<OxiPngOptions>) => {
+        // oxipng 的 optimise 用 `instanceof ImageData` 区分入参(裸 PNG vs 像素),
+        // 必须传真正的 ImageData 实例(浏览器原生;Node 由 CLI 注入 polyfill)。
+        const result = await optimise(toImageData(imageData), options)
         return new Uint8Array(result)
       }
     }
@@ -68,8 +88,8 @@ const webpConfig: CodecInfo<WebpEncodeOptions> = {
     const { encode } = await import('@jsquash/webp')
 
     return {
-      encode: async (imageData: ImageData, options: Partial<WebpEncodeOptions>) => {
-        const result = await encode(imageData, options)
+      encode: async (imageData: RawImage, options: Partial<WebpEncodeOptions>) => {
+        const result = await encode(imageData as unknown as ImageData, options)
         return new Uint8Array(result)
       }
     }
@@ -85,8 +105,8 @@ const avifConfig: CodecInfo<AvifEncodeOptions> = {
     const { encode } = await import('@jsquash/avif')
 
     return {
-      encode: async (imageData: ImageData, options: Partial<AvifEncodeOptions>) => {
-        const result = await encode(imageData, {
+      encode: async (imageData: RawImage, options: Partial<AvifEncodeOptions>) => {
+        const result = await encode(imageData as unknown as ImageData, {
           ...options,
           bitDepth: 8
         })
@@ -104,9 +124,9 @@ const CODEC_CONFIGS: Record<string, CodecInfo<any>> = {
   avif: avifConfig
 }
 
-// 解码器:输入文件字节 → RGBA 像素(ImageData)
+// 解码器:输入文件字节 → RGBA 像素(RawImage,浏览器下即 ImageData)
 // 注意 oxipng 只编码不解码,PNG 解码用独立的 @jsquash/png
-type DecoderFn = (buffer: ArrayBuffer) => Promise<ImageData>
+type DecoderFn = (buffer: ArrayBuffer) => Promise<RawImage>
 
 const DECODER_LOADERS: Record<string, () => Promise<DecoderFn>> = {
   jpeg: async () => {
@@ -128,7 +148,7 @@ const DECODER_LOADERS: Record<string, () => Promise<DecoderFn>> = {
       if (!result) {
         throw new Error('AVIF decode returned null')
       }
-      return result as ImageData
+      return result as RawImage
     }
   }
 }
@@ -156,10 +176,10 @@ export class WASMCodecLoader {
   }
 
   /**
-   * 使用 @jsquash 解码输入文件字节为 RGBA(ImageData)
-   * 失败时抛出,由上层决定是否走 Canvas 兜底
+   * 使用 @jsquash 解码输入文件字节为 RGBA(RawImage)
+   * 失败时抛出,由上层决定是否走解码兜底
    */
-  async decode(format: string, buffer: ArrayBuffer): Promise<ImageData> {
+  async decode(format: string, buffer: ArrayBuffer): Promise<RawImage> {
     const decoder = await this.getDecoder(format)
     return decoder(buffer)
   }
@@ -276,7 +296,7 @@ export class WASMCodecLoader {
       console.log(`Successfully loaded WASM codec: ${config.name}`)
 
       return {
-        encode: async (imageData: ImageData, options: Record<string, unknown>) => {
+        encode: async (imageData: RawImage, options: Record<string, unknown>) => {
           const mergedOptions = { ...config.defaultOptions, ...options }
           return wasmModule.encode(imageData, mergedOptions)
         }
