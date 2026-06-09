@@ -15,7 +15,7 @@ import {
   configureImageOps,
   FILTER_LANCZOS3
 } from '@/services/imageOps'
-import type { CompressionSettings, CompressHooks, CoreResult, RawImage } from './types'
+import type { CompressionSettings, CompressHooks, CoreResult, OutputFormat, RawImage } from './types'
 
 export async function compressImage(
   input: Uint8Array,
@@ -30,6 +30,9 @@ export async function compressImage(
 
   onProgress?.(5)
   const normalized = { ...settings, quality: clampQuality(settings.quality) }
+
+  // 0. 解析输出格式('original' = 保持原文件格式)
+  const outputFormat = resolveOutputFormat(normalized.format, input)
 
   // 1. EXIF orientation(必须在解码前从原始字节读)
   const orientation = await readOrientationSafe(input)
@@ -64,23 +67,32 @@ export async function compressImage(
 
   // 5. 编码(@jsquash);重编码天然剥离元数据,方向已烘焙进像素
   const outImage: RawImage = { data: outRGBA, width: target.width, height: target.height }
-  const codec = await wasmCodecLoader.getCodec(normalized.format)
+  const codec = await wasmCodecLoader.getCodec(outputFormat)
   if (!codec) {
-    throw new Error(`WASM codec not available for format: ${normalized.format}`)
+    throw new Error(`WASM codec not available for format: ${outputFormat}`)
   }
 
-  const data = await codec.encode(outImage, prepareWASMOptions(normalized))
+  const data = await codec.encode(outImage, prepareWASMOptions(outputFormat, normalized.quality))
   onProgress?.(100)
 
-  const codecName = wasmCodecLoader.getCodecName(normalized.format) || normalized.format
+  const codecName = wasmCodecLoader.getCodecName(outputFormat) || outputFormat
   return {
     data,
     originalSize: input.byteLength,
     compressedSize: data.byteLength,
     dimensions: target,
+    format: outputFormat,
     codec: codecName,
     decodedVia
   }
+}
+
+/** 解析输出格式:'original' 时用 magic-bytes 检测原文件格式 */
+function resolveOutputFormat(format: CompressionSettings['format'], input: Uint8Array): OutputFormat {
+  if (format !== 'original') return format
+  const detected = detectInputFormat(input)
+  if (detected) return detected as OutputFormat
+  throw new Error('无法识别原文件格式,请手动指定输出格式')
 }
 
 /**
@@ -150,16 +162,15 @@ async function readOrientationSafe(input: Uint8Array): Promise<number> {
   }
 }
 
-function prepareWASMOptions(settings: CompressionSettings): Record<string, unknown> {
-  const defaultOptions = wasmCodecLoader.getDefaultOptions(settings.format)
+function prepareWASMOptions(format: OutputFormat, quality: number): Record<string, unknown> {
+  const defaultOptions = wasmCodecLoader.getDefaultOptions(format)
   const options: Record<string, unknown> = { ...defaultOptions }
-  const quality = clampQuality(settings.quality)
 
-  switch (settings.format) {
+  switch (format) {
     case 'jpeg':
     case 'webp':
     case 'avif':
-      options.quality = quality
+      options.quality = clampQuality(quality)
       break
     case 'png':
       // PNG 无损,质量设置无效

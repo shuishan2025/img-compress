@@ -18,11 +18,14 @@ export default {
     smallerThan: "↳ 小于 (宽/高)",
     both: "两者",
     one: "其一",
-    convertCmyk: "转换CMYK到RGB",
-    generateWebP: "生成WebP格式",
-    generateAvif: "生成Avif格式",
-    removeBackground: "移除背景",
-    backgroundColor: "↳ 背景颜色",
+    outputFormat: "输出格式",
+    formats: {
+      original: "原格式",
+      jpeg: "JPEG",
+      png: "PNG",
+      webp: "WebP",
+      avif: "AVIF"
+    },
     settingsToggle: "设置"
   },
 

@@ -9,7 +9,7 @@
 
 import { wasmCodecLoader } from './wasmCodecLoader'
 import { compressImage } from '@/core/compress'
-import type { CompressionSettings, RawImage } from '@/core/types'
+import type { CompressionSettings, OutputFormat, RawImage } from '@/core/types'
 
 export interface CompressionResult {
   compressedData: ArrayBuffer
@@ -17,6 +17,7 @@ export interface CompressionResult {
   compressedSize: number
   dimensions: { width: number; height: number }
   method: 'wasm' | 'canvas'
+  format: OutputFormat
   codec?: string
   decodedVia?: 'wasm' | 'canvas'
 }
@@ -71,6 +72,7 @@ export class SmartCompressor {
       compressedSize: result.compressedSize,
       dimensions: result.dimensions,
       method: 'wasm',
+      format: result.format,
       codec: result.codec,
       decodedVia: result.decodedVia
     }

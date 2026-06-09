@@ -6,9 +6,9 @@
  * 平台差异通过 `CompressHooks` 注入。
  */
 
-import type { CompressionSettings } from '@/types/image'
+import type { CompressionSettings, OutputFormat } from '@/types/image'
 
-export type { CompressionSettings }
+export type { CompressionSettings, OutputFormat }
 
 /**
  * 裸像素图像 —— 浏览器的 `ImageData` 是它的超集,Node 下用普通对象即可。
@@ -44,6 +44,8 @@ export interface CoreResult {
   originalSize: number
   compressedSize: number
   dimensions: { width: number; height: number }
+  /** 实际使用的输出格式('original' 已解析为具体格式) */
+  format: OutputFormat
   codec?: string
   /** 解码走的路径:wasm = @jsquash,canvas = 兜底 */
   decodedVia: 'wasm' | 'canvas'

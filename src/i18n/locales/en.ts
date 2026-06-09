@@ -18,11 +18,14 @@ export default {
     smallerThan: "↳ Smaller than (W/H)",
     both: "Both",
     one: "One",
-    convertCmyk: "Convert CMYK to RGB",
-    generateWebP: "Generate WebP",
-    generateAvif: "Generate Avif",
-    removeBackground: "Remove background",
-    backgroundColor: "↳ Background Color",
+    outputFormat: "Output format",
+    formats: {
+      original: "Original",
+      jpeg: "JPEG",
+      png: "PNG",
+      webp: "WebP",
+      avif: "AVIF"
+    },
     settingsToggle: "Settings"
   },
 

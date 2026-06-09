@@ -44,6 +44,7 @@ interface WorkerResponse {
     compressedSize: number
     dimensions: { width: number; height: number }
     method?: 'wasm' | 'canvas'
+    format?: string
     codec?: string
     decodedVia?: 'wasm' | 'canvas'
   }
@@ -65,6 +66,7 @@ const compressImage = async (
   compressedSize: number
   dimensions: { width: number; height: number }
   method?: 'wasm' | 'canvas'
+  format?: string
   codec?: string
   decodedVia?: 'wasm' | 'canvas'
 }> => {
@@ -85,6 +87,7 @@ const compressImage = async (
       compressedSize: result.compressedSize,
       dimensions: result.dimensions,
       method: result.method,
+      format: result.format,
       codec: result.codec,
       decodedVia: result.decodedVia
     }
@@ -134,6 +137,7 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
           compressedSize: result.compressedSize,
           dimensions: result.dimensions,
           method: result.method,
+          format: result.format,
           codec: result.codec,
           decodedVia: result.decodedVia
         }

@@ -24,15 +24,20 @@ const settings = reactive({
   maxHeight: '',
   keepExif: false,
   resizeMode: 'both',
-  convertCmyk: true,
-  generateWebP: false,
-  generateAvif: false,
-  removeBackground: false,
   // Legacy settings for compatibility
   quality: 90,
-  format: 'jpeg',
+  format: 'original' as CompressionSettings['format'],
   removeMetadata: true
 })
+
+// 输出格式选项:默认「原格式」(保持每张图原始格式),可手动指定
+const formatOptions: { value: CompressionSettings['format']; labelKey: string }[] = [
+  { value: 'original', labelKey: 'settings.formats.original' },
+  { value: 'jpeg', labelKey: 'settings.formats.jpeg' },
+  { value: 'png', labelKey: 'settings.formats.png' },
+  { value: 'webp', labelKey: 'settings.formats.webp' },
+  { value: 'avif', labelKey: 'settings.formats.avif' }
+]
 
 const addImages = (newImages: ImageFile[]) => {
   images.value.push(...newImages)
@@ -71,9 +76,9 @@ const startCompression = async (settings: CompressionSettings) => {
           image.compressionMethod = result.method
           image.codec = result.codec
 
-          // 创建压缩后的图片URL
+          // 创建压缩后的图片URL(用实际输出格式;'original' 已在核心解析为具体格式)
           const blob = new Blob([result.compressedData], {
-            type: `image/${settings.format}`
+            type: `image/${result.format ?? 'jpeg'}`
           })
           image.compressedUrl = URL.createObjectURL(blob)
           image.compressedBlob = blob
@@ -219,7 +224,7 @@ const processFiles = async (files: FileList | File[]) => {
       quality: settings.quality,
       maxWidth: settings.maxWidth ? parseInt(settings.maxWidth) : undefined,
       maxHeight: settings.maxHeight ? parseInt(settings.maxHeight) : undefined,
-      format: settings.format as 'jpeg' | 'png' | 'webp' | 'avif',
+      format: settings.format,
       removeMetadata: !settings.keepExif
     }
     startCompression(compressionSettings)
@@ -356,33 +361,18 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="setting-group">
-            <span class="setting-label">{{ t('settings.convertCmyk') }}</span>
-            <el-switch v-model="settings.convertCmyk" />
-          </div>
-        </div>
-
-        <!-- Format Generation Settings -->
-        <div class="settings-row">
-          <div class="setting-group">
-            <span class="setting-label">{{ t('settings.generateWebP') }}</span>
-            <el-switch v-model="settings.generateWebP" />
-          </div>
-
-          <div class="setting-group">
-            <span class="setting-label">{{ t('settings.removeBackground') }}</span>
-            <el-switch v-model="settings.removeBackground" />
-          </div>
-        </div>
-
-        <div class="settings-row">
-          <div class="setting-group">
-            <span class="setting-label">{{ t('settings.generateAvif') }}</span>
-            <el-switch v-model="settings.generateAvif" />
-          </div>
-
-          <div class="setting-group">
-            <span class="setting-label">{{ t('settings.backgroundColor') }}</span>
-            <button class="color-button">×</button>
+            <span class="setting-label">{{ t('settings.outputFormat') }}</span>
+            <div class="resize-mode">
+              <button
+                v-for="opt in formatOptions"
+                :key="opt.value"
+                class="mode-button"
+                :class="{ active: settings.format === opt.value }"
+                @click="settings.format = opt.value"
+              >
+                {{ t(opt.labelKey) }}
+              </button>
+            </div>
           </div>
         </div>
 
